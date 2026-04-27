@@ -1,5 +1,14 @@
 const express = require('express');
-const { signup, verifyOtp, resendVerificationEmail, forgotPassword, verifyResetOtp, resetPasswordotp, login } = require('../controllers/authController');
+// 1. Fixed the import name here (removed 'otp' from the end to match the controller)
+const { 
+    signup, 
+    verifyOtp, 
+    resendVerificationEmail, 
+    forgotPassword, 
+    verifyResetOtp, 
+    resetPassword, 
+    login 
+} = require('../controllers/authController');
 
 const router = express.Router();
 
@@ -9,6 +18,8 @@ router.post('/resend-verification', resendVerificationEmail);
 router.post('/login', login);
 router.post('/forgot-password', forgotPassword);
 router.post('/verify-reset-otp', verifyResetOtp);
-router.post('/reset-password-otp', resetPassword);
+
+// 2. Updated this path to match your HTML fetch call exactly
+router.post('/reset-password', resetPassword);
 
 module.exports = router;
