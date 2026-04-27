@@ -21,9 +21,35 @@ const transporter = nodemailer.createTransport({
     logger: true
 });
 
+const sendResetPasswordOtpEmail = async (user, otpCode) => {
+    await transporter.sendMail({
+        from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject: 'Your EduSync Password Reset Code',
+        html: `
+            <div style="font-family: Arial, sans-serif; background:#f7f7f7; padding:24px;">
+                <div style="max-width:560px; margin:0 auto; background:#ffffff; border:1px solid #ececec; border-radius:12px; overflow:hidden;">
+                    <div style="background:#800020; color:#ffffff; padding:18px 24px; font-size:20px; font-weight:700;">
+                        EduSync Password Reset
+                    </div>
+                    <div style="padding:24px; color:#1f2937; line-height:1.6;">
+                        <p style="margin:0 0 12px 0;">We received a request to reset your password.</p>
+                        <p style="margin:0 0 20px 0;">Enter this 6-digit code in the app to continue:</p>
+                        <div style="text-align:center; margin:20px 0 24px 0;">
+                            <span style="display:inline-block; min-width:220px; padding:14px 18px; border-radius:10px; background:#800020; color:#ffffff; font-size:36px; font-weight:800; letter-spacing:0.3em;">${otpCode}</span>
+                        </div>
+                        <p style="margin:0; color:#4b5563; font-size:14px;">This code expires in 10 minutes.</p>
+                        <p style="margin:10px 0 0 0; color:#6b7280; font-size:13px;">If you did not request this, you can safely ignore this email.</p>
+                    </div>
+                </div>
+            </div>
+        `
+    });
+};
+
 const VERIFICATION_OTP_EXPIRY_MS = 10 * 60 * 1000;
 
-const generateVerificationOtp = () => crypto.randomInt(100000, 1000000).toString();
+const generateVerificationOtp = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 
 const hashVerificationOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest('hex');
 
@@ -211,31 +237,6 @@ const resendVerificationEmail = async (req, res, next) => {
     }
 };
 
-const sendPasswordResetEmail = async (user, resetToken) => {
-    const appUrl = process.env.APP_URL || 'http://localhost:5000';
-    const resetUrl = `${appUrl}/reset-password.html?token=${resetToken}`;
-
-    await transporter.sendMail({
-        from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
-        to: user.email,
-        subject: 'EduSync Password Reset Request',
-        html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-                <h2 style="color: #800020;">Reset Your EduSync Password</h2>
-                <p>We received a request to reset your password. Click the button below to continue.</p>
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="${resetUrl}" style="display:inline-block;padding:14px 24px;background:#800020;color:#ffffff;text-decoration:none;border-radius:6px;font-weight: bold;">
-                        Reset Password
-                    </a>
-                </div>
-                <p style="font-size: 0.875rem; color: #6b7280;">This reset link expires in 1 hour.</p>
-                <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-                <p style="font-size: 0.75rem; color: #9ca3af;">If you did not request this, you can ignore this email.</p>
-            </div>
-        `
-    });
-};
-
 const forgotPassword = async (req, res, next) => {
     try {
         const { email } = req.body;
@@ -247,18 +248,19 @@ const forgotPassword = async (req, res, next) => {
         const user = await User.findOne({ email });
 
         if (user) {
-            const resetToken = crypto.randomBytes(20).toString('hex');
-            const resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
+            const otpCode = generateVerificationOtp();
+            const resetPasswordOtpHash = hashVerificationOtp(otpCode);
+            const resetPasswordOtpExpires = new Date(Date.now() + VERIFICATION_OTP_EXPIRY_MS);
 
-            user.resetPasswordToken = resetToken;
-            user.resetPasswordExpires = resetPasswordExpires;
+            user.resetPasswordOtpHash = resetPasswordOtpHash;
+            user.resetPasswordOtpExpires = resetPasswordOtpExpires;
             await user.save();
 
             try {
-                await sendPasswordResetEmail(user, resetToken);
+                await sendResetPasswordOtpEmail(user, otpCode);
             } catch (mailError) {
-                user.resetPasswordToken = null;
-                user.resetPasswordExpires = null;
+                user.resetPasswordOtpHash = null;
+                user.resetPasswordOtpExpires = null;
                 await user.save();
                 throw mailError;
             }
@@ -266,34 +268,79 @@ const forgotPassword = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            message: 'If an account exists with this email, a reset link has been sent.'
+            message: 'If an account exists with this email, a password reset code has been sent to your email.'
         });
     } catch (error) {
         next(error);
     }
 };
 
-const resetPassword = async (req, res, next) => {
-    try {
-        const { token } = req.params;
-        const { password } = req.body;
 
-        if (!password) {
-            throw new AppError('Password is required', 400);
+const verifyResetOtp = async (req, res, next) => {
+    try {
+        const { email, otpCode } = req.body;
+
+        if (!email || !otpCode) {
+            throw new AppError('Email and OTP code are required', 400);
         }
 
-        const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpires: { $gt: Date.now() }
-        });
+        const user = await User.findOne({ email });
 
         if (!user) {
-            throw new AppError('Invalid or expired password reset token', 400);
+            throw new AppError('User not found', 404);
+        }
+
+        if (!user.resetPasswordOtpHash || !user.resetPasswordOtpExpires) {
+            throw new AppError('No password reset code found. Please request a new code.', 400);
+        }
+
+        if (user.resetPasswordOtpExpires.getTime() < Date.now()) {
+            throw new AppError('Password reset code expired. Please request a new code.', 400);
+        }
+
+        const incomingOtpHash = hashVerificationOtp(otpCode.trim());
+        if (incomingOtpHash !== user.resetPasswordOtpHash) {
+            throw new AppError('Invalid password reset code.', 400);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'OTP verified successfully. You can now reset your password.'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+const resetPassword = async (req, res, next) => {
+    try {
+        const { email, otpCode, password } = req.body;
+
+        if (!email || !otpCode || !password) {
+            throw new AppError('Email, OTP code, and new password are required', 400);
+        }
+
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            throw new AppError('User not found', 404);
+        }
+
+        if (!user.resetPasswordOtpHash || !user.resetPasswordOtpExpires) {
+            throw new AppError('No password reset code found. Please request a new code.', 400);
+        }
+
+        if (user.resetPasswordOtpExpires.getTime() < Date.now()) {
+            throw new AppError('Password reset code expired. Please request a new code.', 400);
+        }
+
+        const incomingOtpHash = hashVerificationOtp(otpCode.trim());
+        if (incomingOtpHash !== user.resetPasswordOtpHash) {
+            throw new AppError('Invalid password reset code.', 400);
         }
 
         user.password = await bcrypt.hash(password, 10);
-        user.resetPasswordToken = undefined;
-        user.resetPasswordExpires = undefined;
+        user.resetPasswordOtpHash = null;
+        user.resetPasswordOtpExpires = null;
         await user.save();
 
         res.status(200).json({
@@ -357,6 +404,7 @@ module.exports = {
     verifyOtp,
     resendVerificationEmail,
     forgotPassword,
+    verifyResetOtp,
     resetPassword,
     login
 };
