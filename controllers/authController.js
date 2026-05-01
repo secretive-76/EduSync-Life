@@ -197,7 +197,7 @@ const verifyOtp = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-};
+};//ki apjhap
 
 const resendVerificationEmail = async (req, res, next) => {
     try {
