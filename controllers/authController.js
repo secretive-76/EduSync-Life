@@ -6,12 +6,18 @@ const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // Use SSL for port 465
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
-    connectionTimeout: 10000
+    tls: {
+        rejectUnauthorized: false // Prevents the self-signed certificate/timeout issue
+    },
+    connectionTimeout: 10000,
+    family: 4 // Forces the use of IPv4 to avoid the ENETUNREACH error
 });
 
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
