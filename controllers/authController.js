@@ -35,11 +35,13 @@ const createMailPayload = ({ to, subject, html, text }) => ({
 });
 
 const sendResetPasswordOtpEmail = async (user, otpCode) => {
-    await transporter.sendMail(createMailPayload({
-        to: user.email,
-        subject: 'Your EduSync Password Reset Code',
-        text: `Your EduSync password reset code is ${otpCode}. It expires in 10 minutes.`,
-        html: `
+    console.log('sendResetPasswordOtpEmail: start for', user && user.email);
+    try {
+        const info = await transporter.sendMail(createMailPayload({
+            to: user.email,
+            subject: 'Your EduSync Password Reset Code',
+            text: `Your EduSync password reset code is ${otpCode}. It expires in 10 minutes.`,
+            html: `
             <div style="font-family: Arial, sans-serif; background:#f7f7f7; padding:24px;">
                 <div style="max-width:560px; margin:0 auto; background:#ffffff; border:1px solid #ececec; border-radius:12px; overflow:hidden;">
                     <div style="background:#800020; color:#ffffff; padding:18px 24px; font-size:20px; font-weight:700;">
@@ -57,7 +59,13 @@ const sendResetPasswordOtpEmail = async (user, otpCode) => {
                 </div>
             </div>
         `
-    }));
+        }));
+        console.log('sendResetPasswordOtpEmail: sent, messageId=', info && info.messageId);
+        return info;
+    } catch (err) {
+        console.error('sendResetPasswordOtpEmail: error', err);
+        throw err;
+    }
 };
 
 const VERIFICATION_OTP_EXPIRY_MS = 10 * 60 * 1000;
@@ -256,13 +264,23 @@ const resendVerificationEmail = async (req, res, next) => {
 
 const forgotPassword = async (req, res, next) => {
     try {
-        const email = normalizeEmail(req.body.email);
+        const rawEmail = String(req.body.email || '');
+        const email = normalizeEmail(rawEmail);
+        console.log('forgotPassword: request received. rawEmail=', rawEmail, 'normalized=', email);
 
         if (!email) {
             throw new AppError('Email is required', 400);
         }
 
-        const user = await User.findOne({ email });
+        let user = await User.findOne({ email });
+        if (!user) {
+            console.log('forgotPassword: user not found with normalized email, trying raw lookup=', rawEmail);
+            user = await User.findOne({ email: rawEmail });
+            if (user) console.log('forgotPassword: user found with raw email=', user.email);
+            else console.log('forgotPassword: no user found for email');
+        } else {
+            console.log('forgotPassword: user found with normalized email=', user.email);
+        }
 
         if (user) {
             const otpCode = generateVerificationOtp();
@@ -274,8 +292,11 @@ const forgotPassword = async (req, res, next) => {
             await user.save();
 
             try {
+                console.log('forgotPassword: calling sendResetPasswordOtpEmail for', user.email);
                 await sendResetPasswordOtpEmail(user, otpCode);
+                console.log('forgotPassword: sendResetPasswordOtpEmail completed for', user.email);
             } catch (mailError) {
+                console.error('forgotPassword: mail error', mailError);
                 user.resetPasswordOtpHash = null;
                 user.resetPasswordOtpExpires = null;
                 await user.save();
