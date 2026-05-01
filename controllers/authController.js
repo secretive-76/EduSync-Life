@@ -119,6 +119,7 @@ const signup = async (req, res, next) => {
         let user;
 
         if (existingUser) {
+            console.log('signup: existing user found=', existingUser.email);
             if (existingUser.isVerified) {
                 throw new AppError('An account with this email already exists', 409);
             }
@@ -131,6 +132,7 @@ const signup = async (req, res, next) => {
             user = existingUser;
             await user.save();
         } else {
+            console.log('signup: creating new user for=', email);
             user = new User({
                 username,
                 email,
@@ -143,9 +145,20 @@ const signup = async (req, res, next) => {
         }
 
         try {
+            console.log('signup: sending verification email to', user.email);
             await sendVerificationOtpEmail(user, otpCode);
+            console.log('signup: verification email sent to', user.email);
         } catch (mailError) {
-            console.error('OTP email error:', mailError);
+            console.error('OTP email error during signup:', mailError);
+            // rollback the stored OTP so user can retry safely
+            try {
+                user.verificationOtpHash = null;
+                user.verificationOtpExpires = null;
+                await user.save();
+                console.log('signup: rolled back verification OTP for', user.email);
+            } catch (rollbackErr) {
+                console.error('signup: failed to rollback verification OTP', rollbackErr);
+            }
             throw new AppError('Account created, but the verification email could not be sent. Please try resending the code.', 500);
         }
 
@@ -247,9 +260,20 @@ const resendVerificationEmail = async (req, res, next) => {
         await user.save();
 
         try {
+            console.log('resendVerificationEmail: sending verification email to', user.email);
             await sendVerificationOtpEmail(user, otpCode);
+            console.log('resendVerificationEmail: sent verification email to', user.email);
         } catch (mailError) {
             console.error('OTP resend error:', mailError);
+            // rollback OTP fields on failure
+            try {
+                user.verificationOtpHash = null;
+                user.verificationOtpExpires = null;
+                await user.save();
+                console.log('resendVerificationEmail: rolled back verification OTP for', user.email);
+            } catch (rbErr) {
+                console.error('resendVerificationEmail: rollback failed', rbErr);
+            }
             throw new AppError('Verification code was generated, but the email could not be sent. Please try again shortly.', 500);
         }
 
