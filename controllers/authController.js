@@ -11,9 +11,9 @@ if (typeof dns.setDefaultResultOrder === 'function') {
 }
 
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true, 
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: Number(process.env.EMAIL_PORT) || 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -31,7 +31,7 @@ const transporter = nodemailer.createTransport({
 
 // Verify SMTP transporter at startup to catch network/auth issues early
 transporter.verify()
-    .then(() => console.log('SMTP transporter verified ✅'))
+    .then(() => console.log('SMTP Server is ready'))
     .catch((err) => console.error('SMTP transporter verification failed:', err));
 
 // Controller: run verify on-demand (HTTP) for remote debugging
