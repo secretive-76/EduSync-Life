@@ -7,22 +7,20 @@ const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // Use false for Port 587; it will upgrade via STARTTLS
+    port: 465,
+    secure: true, // Use true for Port 465
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        // This is the critical fix for the ENETUNREACH error
-        // It forces the connection to use IPv4 instead of IPv6
-        family: 4, 
+        family: 4, // Keeps the fix for the IPv6/ENETUNREACH error
         rejectUnauthorized: false
     },
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 5000,    // Helps prevent hanging during the initial handshake
-    socketTimeout: 15000,     // Total time allowed for the socket to remain idle
-    debug: true,              // Keep these true for your logs during the demo
+    connectionTimeout: 20000, // Increased to 20s to give more time on free tier
+    greetingTimeout: 10000,
+    socketTimeout: 25000,
+    debug: true,
     logger: true
 });
 const sendResetPasswordOtpEmail = async (user, otpCode) => {
