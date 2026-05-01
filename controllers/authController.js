@@ -4,10 +4,15 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
+const dns = require('dns');
+
+if (typeof dns.setDefaultResultOrder === 'function') {
+    dns.setDefaultResultOrder('ipv4first');
+}
 
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: Number(process.env.EMAIL_PORT) || 465,
     secure: true, // This MUST be true for Port 465
     auth: {
         user: process.env.EMAIL_USER,
@@ -17,12 +22,14 @@ const transporter = nodemailer.createTransport({
         family: 4, // Forces IPv4 to prevent the ENETUNREACH error seen earlier
         rejectUnauthorized: false
     },
-    connectionTimeout: 20000, // Increased to 20 seconds for stability
-    greetingTimeout: 10000,
-    socketTimeout: 25000,
+    connectionTimeout: 30000, // Give Render more time during slow outbound handshakes
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
     debug: true,
     logger: true
-});const sendResetPasswordOtpEmail = async (user, otpCode) => {
+});
+
+const sendResetPasswordOtpEmail = async (user, otpCode) => {
     await transporter.sendMail({
         from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
         to: user.email,
