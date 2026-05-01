@@ -8,22 +8,21 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
-    secure: true, // Use true for Port 465
+    secure: true, // This MUST be true for Port 465
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        family: 4, // Keeps the fix for the IPv6/ENETUNREACH error
+        family: 4, // Forces IPv4 to prevent the ENETUNREACH error seen earlier
         rejectUnauthorized: false
     },
-    connectionTimeout: 20000, // Increased to 20s to give more time on free tier
+    connectionTimeout: 20000, // Increased to 20 seconds for stability
     greetingTimeout: 10000,
     socketTimeout: 25000,
     debug: true,
     logger: true
-});
-const sendResetPasswordOtpEmail = async (user, otpCode) => {
+});const sendResetPasswordOtpEmail = async (user, otpCode) => {
     await transporter.sendMail({
         from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
         to: user.email,
