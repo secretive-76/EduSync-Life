@@ -23,6 +23,11 @@ mongoose.connect(process.env.MONGO_URI)
     .then(() => console.log('Connected to MongoDB! ✅'))
     .catch((err) => console.error('MongoDB Connection Error: ❌', err));
 
+// Root route: provide a small informational response so '/' doesn't return 404 on Render
+app.get('/', (req, res) => {
+    res.json({ success: true, message: 'EduSync API is running. See /health for status.' });
+});
+
 app.get('/health', (req, res) => res.json({ success: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/academic', academicRoutes);
