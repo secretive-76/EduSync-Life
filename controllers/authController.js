@@ -6,26 +6,33 @@ const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false,
+    service: 'gmail',
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
-    tls: {
-        rejectUnauthorized: false
+    connectionTimeout: 10000
+});
+
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+
+const createMailPayload = ({ to, subject, html, text }) => ({
+    from: {
+        name: 'EduSync Support',
+        address: process.env.EMAIL_USER
     },
-    connectionTimeout: 10000,
-    debug: true,
-    logger: true
+    replyTo: process.env.EMAIL_USER,
+    to,
+    subject,
+    html,
+    text
 });
 
 const sendResetPasswordOtpEmail = async (user, otpCode) => {
-    await transporter.sendMail({
-        from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
+    await transporter.sendMail(createMailPayload({
         to: user.email,
         subject: 'Your EduSync Password Reset Code',
+        text: `Your EduSync password reset code is ${otpCode}. It expires in 10 minutes.`,
         html: `
             <div style="font-family: Arial, sans-serif; background:#f7f7f7; padding:24px;">
                 <div style="max-width:560px; margin:0 auto; background:#ffffff; border:1px solid #ececec; border-radius:12px; overflow:hidden;">
@@ -44,7 +51,7 @@ const sendResetPasswordOtpEmail = async (user, otpCode) => {
                 </div>
             </div>
         `
-    });
+    }));
 };
 
 const VERIFICATION_OTP_EXPIRY_MS = 10 * 60 * 1000;
@@ -54,10 +61,10 @@ const generateVerificationOtp = () => String(crypto.randomInt(0, 1000000)).padSt
 const hashVerificationOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest('hex');
 
 const sendVerificationOtpEmail = async (user, otpCode) => {
-    await transporter.sendMail({
-        from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
+    await transporter.sendMail(createMailPayload({
         to: user.email,
         subject: 'Your EduSync verification code',
+        text: `Your EduSync verification code is ${otpCode}. It expires in 10 minutes.`,
         html: `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
                 <h2 style="color: #2563eb;">Verify your EduSync account</h2>
@@ -69,7 +76,7 @@ const sendVerificationOtpEmail = async (user, otpCode) => {
                 <p style="font-size: 0.875rem; color: #6b7280;">If you did not create this account, you can ignore this email.</p>
             </div>
         `
-    });
+    }));
 };
 
 const buildUserPayload = (user) => ({
@@ -82,7 +89,8 @@ const buildUserPayload = (user) => ({
 const signup = async (req, res, next) => {
     try {
         console.log('Signup Request Body:', req.body);
-        const { email, password, username } = req.body;
+        const email = normalizeEmail(req.body.email);
+        const { password, username } = req.body;
 
         if (!email || !password) {
             throw new AppError('Email and password are required', 400);
@@ -124,6 +132,7 @@ const signup = async (req, res, next) => {
             await sendVerificationOtpEmail(user, otpCode);
         } catch (mailError) {
             console.error('OTP email error:', mailError);
+            throw new AppError('Account created, but the verification email could not be sent. Please try resending the code.', 500);
         }
 
         res.status(existingUser ? 200 : 201).json({
@@ -141,7 +150,8 @@ const signup = async (req, res, next) => {
 
 const verifyOtp = async (req, res, next) => {
     try {
-        const { email, otpCode } = req.body;
+        const email = normalizeEmail(req.body.email);
+        const { otpCode } = req.body;
 
         if (!email || !otpCode) {
             throw new AppError('Email and OTP code are required', 400);
@@ -201,7 +211,7 @@ const verifyOtp = async (req, res, next) => {
 
 const resendVerificationEmail = async (req, res, next) => {
     try {
-        const { email } = req.body;
+        const email = normalizeEmail(req.body.email);
 
         if (!email) {
             throw new AppError('Email is required', 400);
@@ -226,6 +236,7 @@ const resendVerificationEmail = async (req, res, next) => {
             await sendVerificationOtpEmail(user, otpCode);
         } catch (mailError) {
             console.error('OTP resend error:', mailError);
+            throw new AppError('Verification code was generated, but the email could not be sent. Please try again shortly.', 500);
         }
 
         res.status(200).json({
@@ -239,7 +250,7 @@ const resendVerificationEmail = async (req, res, next) => {
 
 const forgotPassword = async (req, res, next) => {
     try {
-        const { email } = req.body;
+        const email = normalizeEmail(req.body.email);
 
         if (!email) {
             throw new AppError('Email is required', 400);
@@ -278,7 +289,8 @@ const forgotPassword = async (req, res, next) => {
 
 const verifyResetOtp = async (req, res, next) => {
     try {
-        const { email, otpCode } = req.body;
+        const email = normalizeEmail(req.body.email);
+        const { otpCode } = req.body;
 
         if (!email || !otpCode) {
             throw new AppError('Email and OTP code are required', 400);
@@ -313,7 +325,8 @@ const verifyResetOtp = async (req, res, next) => {
 };
 const resetPassword = async (req, res, next) => {
     try {
-        const { email, otpCode, password } = req.body;
+        const email = normalizeEmail(req.body.email);
+        const { otpCode, password } = req.body;
 
         if (!email || !otpCode || !password) {
             throw new AppError('Email, OTP code, and new password are required', 400);
@@ -354,7 +367,8 @@ const resetPassword = async (req, res, next) => {
 
 const login = async (req, res, next) => {
     try {
-        const { email, password } = req.body;
+        const email = normalizeEmail(req.body.email);
+        const { password } = req.body;
 
         if (!email || !password) {
             throw new AppError('Email and password are required', 400);
