@@ -24,6 +24,7 @@ mongoose.connect(process.env.MONGO_URI)
     .catch((err) => console.error('MongoDB Connection Error: ❌', err));
 
 app.get('/health', (req, res) => res.json({ success: true }));
+app.get('/', (req, res) => res.send('EduSync Backend is Live and Running! 🚀'));
 app.use('/api/auth', authRoutes);
 app.use('/api/academic', academicRoutes);
 app.use('/api/finance', financeRoutes);
