@@ -11,22 +11,22 @@ if (typeof dns.setDefaultResultOrder === 'function') {
 }
 
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: Number(process.env.EMAIL_PORT) || 465,
-    secure: true, // This MUST be true for Port 465
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, 
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        family: 4, // Forces IPv4 to prevent the ENETUNREACH error seen earlier
+        // This is the most common reason for Render failures
+        family: 4, 
         rejectUnauthorized: false
     },
-    connectionTimeout: 30000, // Give Render more time during slow outbound handshakes
-    greetingTimeout: 15000,
-    socketTimeout: 30000,
-    debug: true,
-    logger: true
+    // Adding extra time for the Render free tier's slow network
+    connectionTimeout: 30000, 
+    greetingTimeout: 30000,
+    socketTimeout: 30000
 });
 
 const sendResetPasswordOtpEmail = async (user, otpCode) => {
