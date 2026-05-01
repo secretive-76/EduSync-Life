@@ -29,6 +29,21 @@ const transporter = nodemailer.createTransport({
     socketTimeout: 30000
 });
 
+// Verify SMTP transporter at startup to catch network/auth issues early
+transporter.verify()
+    .then(() => console.log('SMTP transporter verified ✅'))
+    .catch((err) => console.error('SMTP transporter verification failed:', err));
+
+// Controller: run verify on-demand (HTTP) for remote debugging
+const verifyMailer = async (req, res, next) => {
+    try {
+        await transporter.verify();
+        res.status(200).json({ success: true, message: 'SMTP connection successful' });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const sendResetPasswordOtpEmail = async (user, otpCode) => {
     await transporter.sendMail({
         from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
@@ -414,5 +429,6 @@ module.exports = {
     forgotPassword,
     verifyResetOtp,
     resetPassword,
-    login
+    login,
+    verifyMailer
 };

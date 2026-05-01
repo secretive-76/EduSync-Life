@@ -7,7 +7,8 @@ const {
     forgotPassword, 
     verifyResetOtp, 
     resetPassword, 
-    login 
+    login,
+    verifyMailer
 } = require('../controllers/authController');
 
 const router = express.Router();
@@ -21,5 +22,8 @@ router.post('/verify-reset-otp', verifyResetOtp);
 
 // 2. Updated this path to match your HTML fetch call exactly
 router.post('/reset-password', resetPassword);
+
+// Debug route: verify SMTP connection (returns transporter.verify() result)
+router.get('/debug/mail-verify', verifyMailer);
 
 module.exports = router;
