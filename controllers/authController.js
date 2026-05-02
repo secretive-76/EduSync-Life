@@ -16,18 +16,20 @@ if (dns.setDefaultResultOrder) {
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
-    secure: false, 
+    secure: false, // TLS
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
-    // 2. FORCE the socket to use IPv4
-    family: 4, 
-    connectionTimeout: 20000,
+    family: 4, // Forces IPv4 to bypass the ENETUNREACH error
+    connectionTimeout: 45000, // 45 seconds to allow for cloud latency
+    greetingTimeout: 45000,
+    socketTimeout: 45000,
+    debug: true, // Enable this to see the exact SMTP conversation in logs
+    logger: true, // This will log the actual handshake steps
     tls: {
-        // 3. Strict TLS settings to prevent handshake hangs
         rejectUnauthorized: false,
-        minVersion: 'TLSv1.2'
+        minVersion: "TLSv1.2"
     }
 });
 const VERIFICATION_OTP_EXPIRY_MS = 10 * 60 * 1000;
