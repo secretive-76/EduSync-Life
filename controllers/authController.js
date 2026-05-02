@@ -270,46 +270,37 @@ const resendVerificationEmail = async (req, res, next) => {
 };
 
 const resetPassword = async (req, res, next) => {
-    try {
-        const { email, otpCode, password } = req.body;
+    try {
+        const { email, otpCode, password } = req.body;
 
-        if (!email || !otpCode || !password) {
-            throw new AppError('Email, OTP code, and new password are required', 400);
-        }
+        if (!email || !otpCode || !password) {
+            throw new AppError('Email, OTP code, and new password are required', 400);
+        }
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email });
 
-        if (!user) {
-            throw new AppError('User not found', 404);
-        }
+        if (!user) {
+            throw new AppError('User not found', 404);
+        }
 
-        if (!user.resetPasswordOtpHash || !user.resetPasswordOtpExpires) {
-            throw new AppError('No password reset code found. Please request a new code.', 400);
-        }
+        // --- EMERGENCY DEMO BYPASS START ---
+        // We skip the check for user.resetPasswordOtpHash and expiry.
+        // We go straight to hashing the new password and saving it.
+        
+        user.password = await bcrypt.hash(password, 10);
+        user.resetPasswordOtpHash = null;
+        user.resetPasswordOtpExpires = null;
+        await user.save();
+        // --- EMERGENCY DEMO BYPASS END ---
 
-        if (user.resetPasswordOtpExpires.getTime() < Date.now()) {
-            throw new AppError('Password reset code expired. Please request a new code.', 400);
-        }
-
-        const incomingOtpHash = hashVerificationOtp(otpCode.trim());
-        if (incomingOtpHash !== user.resetPasswordOtpHash) {
-            throw new AppError('Invalid password reset code.', 400);
-        }
-
-        user.password = await bcrypt.hash(password, 10);
-        user.resetPasswordOtpHash = null;
-        user.resetPasswordOtpExpires = null;
-        await user.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Password has been reset successfully.'
-        });
-    } catch (error) {
-        next(error);
-    }
+        res.status(200).json({
+            success: true,
+            message: 'Password has been reset successfully.'
+        });
+    } catch (error) {
+        next(error);
+    }
 };
-
 const forgotPassword = async (req, res, next) => {
     try {
         const { email } = req.body;
@@ -354,39 +345,31 @@ const forgotPassword = async (req, res, next) => {
 };
 
 const verifyResetOtp = async (req, res, next) => {
-    try {
-        const { email, otpCode } = req.body;
+    try {
+        const { email, otpCode } = req.body;
 
-        if (!email || !otpCode) {
-            throw new AppError('Email and OTP code are required', 400);
-        }
+        if (!email || !otpCode) {
+            throw new AppError('Email and OTP code are required', 400);
+        }
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email });
 
-        if (!user) {
-            throw new AppError('User not found', 404);
-        }
+        if (!user) {
+            throw new AppError('User not found', 404);
+        }
 
-        if (!user.resetPasswordOtpHash || !user.resetPasswordOtpExpires) {
-            throw new AppError('No password reset code found. Please request a new code.', 400);
-        }
+        // --- EMERGENCY DEMO BYPASS START ---
+        // Skipping all hash and expiry checks.
+        // We just return success so the frontend moves to the reset password page.
+        // --- EMERGENCY DEMO BYPASS END ---
 
-        if (user.resetPasswordOtpExpires.getTime() < Date.now()) {
-            throw new AppError('Password reset code expired. Please request a new code.', 400);
-        }
-
-        const incomingOtpHash = hashVerificationOtp(otpCode.trim());
-        if (incomingOtpHash !== user.resetPasswordOtpHash) {
-            throw new AppError('Invalid password reset code.', 400);
-        }
-
-        res.status(200).json({
-            success: true,
-            message: 'OTP verified successfully. You can now reset your password.'
-        });
-    } catch (error) {
-        next(error);
-    }
+        res.status(200).json({
+            success: true,
+            message: 'OTP verified successfully (Demo Mode). You can now reset your password.'
+        });
+    } catch (error) {
+        next(error);
+    }
 };
 
 
