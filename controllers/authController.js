@@ -17,17 +17,19 @@ oAuth2Client.setCredentials({ refresh_token: process.env.REFRESH_TOKEN });
 const sendEmail = async (options) => {
   const accessToken = await oAuth2Client.getAccessToken();
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      type: 'OAuth2',
-      user: process.env.EMAIL_USER,
-      clientId: process.env.CLIENT_ID,
-      clientSecret: process.env.CLIENT_SECRET,
-      refreshToken: process.env.REFRESH_TOKEN,
-      accessToken: accessToken.token,
-    },
-  });
+ const transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465, // Use 465 for SSL
+  secure: true, // Use true for port 465
+  auth: {
+    type: 'OAuth2',
+    user: process.env.EMAIL_USER,
+    clientId: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    refreshToken: process.env.REFRESH_TOKEN,
+    accessToken: accessToken.token,
+  },
+});
 
   const mailOptions = {
     from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
