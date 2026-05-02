@@ -90,10 +90,18 @@ const generateVerificationOtp = () => String(crypto.randomInt(0, 1000000)).padSt
 const hashVerificationOtp = (otp) => crypto.createHash('sha256').update(String(otp)).digest('hex');
 
 const sendVerificationOtpEmail = async (user, otpCode) => {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
         from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
         to: user.email,
-        subject: 'Your EduSync verification code',
+        replyTo: process.env.EMAIL_USER,
+        // Using the envelope helps with SMTP routing on Render
+        envelope: {
+            from: process.env.EMAIL_USER,
+            to: user.email
+        },
+        subject: 'Your EduSync Verification Code',
+        // Plain text fallback improves spam scores
+        text: `Verify your EduSync account. Your 6-digit code is: ${otpCode}. It expires in 10 minutes.`,
         html: `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
                 <h2 style="color: #2563eb;">Verify your EduSync account</h2>
@@ -106,8 +114,13 @@ const sendVerificationOtpEmail = async (user, otpCode) => {
             </div>
         `
     });
-};
 
+    // Logging this helps you confirm Render successfully handed the mail to Gmail
+    console.log('Verification email sent:', {
+        messageId: info.messageId,
+        accepted: info.accepted
+    });
+};
 const buildUserPayload = (user) => ({
     id: user._id,
     username: user.username,
