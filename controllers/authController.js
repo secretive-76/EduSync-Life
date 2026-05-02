@@ -31,9 +31,9 @@ const transporter = nodemailer.createTransport({
 });
 
 // Verify SMTP transporter at startup to catch network/auth issues early
-transporter.verify()
-    .then(() => console.log('SMTP Server is ready'))
-    .catch((err) => console.error('SMTP transporter verification failed:', err));
+//transporter.verify()
+   // .then(() => console.log('SMTP Server is ready'))
+    //.catch((err) => console.error('SMTP transporter verification failed:', err));
 
 // Controller: run verify on-demand (HTTP) for remote debugging
 const verifyMailer = async (req, res, next) => {
