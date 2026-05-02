@@ -10,8 +10,6 @@ const productivityRoutes = require('./routes/productivityRoutes');
 const calendarRoutes = require('./routes/calendarRoutes');
 const routineRoutes = require('./routes/routineRoutes');
 const reminderRoutes = require('./routes/reminderRoutes');
-const { resetDismissedReminders } = require('./controllers/calendarController');
-const { resetDismissedRoutineTasks } = require('./controllers/routineController');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -48,27 +46,6 @@ app.use('/api/reminders', reminderRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
-
-let lastDismissResetDay = null;
-
-const runDailyDismissResetCheck = async () => {
-    try {
-        const now = new Date();
-        const dayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
-        const isMidnightWindow = now.getHours() === 0 && now.getMinutes() === 0;
-
-        if (isMidnightWindow && lastDismissResetDay !== dayKey) {
-            await resetDismissedReminders();
-            await resetDismissedRoutineTasks();
-            lastDismissResetDay = dayKey;
-            console.log('Midnight reminder dismiss reset completed ✅');
-        }
-    } catch (error) {
-        console.error('Failed to run reminder dismiss reset:', error.message);
-    }
-};
-
-setInterval(runDailyDismissResetCheck, 60000);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
