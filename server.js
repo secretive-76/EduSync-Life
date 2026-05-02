@@ -17,8 +17,9 @@ const { notFound, errorHandler } = require('./middleware/errorHandler');
 const app = express();
 
 app.use(cors({
-    origin: 'https://edusync-frontend-rndc.onrender.com', // Your actual Render frontend URL
-    credentials: true
+    origin: 'https://edusync-frontend-rndc.onrender.com',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 app.use(express.json());
 
