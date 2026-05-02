@@ -74,10 +74,24 @@ const normalizeEventPayload = (body = {}) => {
     }
 
     if (Object.prototype.hasOwnProperty.call(body, 'date')) {
-        const parsedDate = new Date(body.date);
+        const raw = body.date;
+        let parsedDate;
+
+        // If client sent a plain YYYY-MM-DD string, treat it as a local date (avoid timezone shift)
+        const ymdMatch = typeof raw === 'string' && raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (ymdMatch) {
+            const y = Number(ymdMatch[1]);
+            const m = Number(ymdMatch[2]) - 1;
+            const d = Number(ymdMatch[3]);
+            parsedDate = new Date(y, m, d);
+        } else {
+            parsedDate = new Date(raw);
+        }
+
         if (Number.isNaN(parsedDate.getTime())) {
             throw new AppError('Invalid date format', 400);
         }
+
         payload.date = parsedDate;
         payload.time = formatTimeFromDate(parsedDate);
     }
