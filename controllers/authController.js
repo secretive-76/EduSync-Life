@@ -11,13 +11,17 @@ if (typeof dns.setDefaultResultOrder === 'function') {
 }
 
 const transporter = nodemailer.createTransport({
+  service: 'gmail', // Using the built-in service helper
   host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // true for 465, false for 587
+  port: 587,
+  secure: false, // Must be false for port 587
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // Your 16-character App Password
+    pass: process.env.EMAIL_PASS,
   },
+  tls: {
+    rejectUnauthorized: false // This helps bypass some network security blocks
+  }
 });
 
 // Controller: run verify on-demand (HTTP) for remote debugging
