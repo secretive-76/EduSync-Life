@@ -270,14 +270,22 @@ const forgotPassword = async (req, res, next) => {
             user.resetPasswordOtpExpires = new Date(Date.now() + VERIFICATION_OTP_EXPIRY_MS);
             await user.save();
 
-            try {
-                await sendResetPasswordOtpEmail(user, otpCode);
-            } catch (mailError) {
-                user.resetPasswordOtpHash = null;
-                user.resetPasswordOtpExpires = null;
-                await user.save();
-                throw mailError;
-            }
+            setImmediate(() => {
+                sendResetPasswordOtpEmail(user, otpCode).catch(async (mailError) => {
+                    console.error('Reset password email error:', mailError);
+                    try {
+                        const latestUser = await User.findById(user._id);
+
+                        if (latestUser) {
+                            latestUser.resetPasswordOtpHash = null;
+                            latestUser.resetPasswordOtpExpires = null;
+                            await latestUser.save();
+                        }
+                    } catch (cleanupError) {
+                        console.error('Reset password cleanup error:', cleanupError);
+                    }
+                });
+            });
         }
 
         res.status(200).json({
