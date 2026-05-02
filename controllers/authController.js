@@ -46,19 +46,16 @@ const buildUserPayload = (user) => ({
     isVerified: user.isVerified
 });
 
-const sendVerificationOtpEmail = async (user, otpCode) => {
-    const info = await sendEmail({
-        email: user.email,
-        subject: 'Your EduSync Verification Code',
-        text: `Verify your EduSync account. Your 6-digit code is: ${otpCode}. It expires in 10 minutes.`,
-        html: `<!-- your html here -->`
-    });
-
-    // Logging this helps you confirm Render successfully handed the mail to Gmail
-    console.log('Verification email sent:', {
-        messageId: info.messageId,
-        accepted: info.accepted
-    });
+const sendVerificationOtpEmail = async (user, otp) => {
+    try {
+        // Just log it so you can see it in the terminal
+        console.log(`DEMO MODE: OTP for ${user.email} is ${otp}`);
+        
+        // Return immediately without calling the real transporter
+        return { status: 'sent' }; 
+    } catch (err) {
+        console.log("Email skipped for demo.");
+    }
 };
 
 const sendResetPasswordOtpEmail = async (user, otpCode) => {
@@ -194,66 +191,44 @@ const login = async (req, res, next) => {
         next(error);
     }
 };
-
-
 const verifyOtp = async (req, res, next) => {
-    try {
-        const { email, otpCode } = req.body;
+    try {
+        const { email, otpCode } = req.body;
 
-        if (!email || !otpCode) {
-            throw new AppError('Email and OTP code are required', 400);
-        }
+        if (!email || !otpCode) {
+            throw new AppError('Email and OTP code are required', 400);
+        }
 
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ email });
 
-        if (!user) {
-            throw new AppError('User not found', 404);
-        }
+        if (!user) {
+            throw new AppError('User not found', 404);
+        }
 
-        if (user.isVerified) {
-            const token = process.env.JWT_SECRET
-                ? jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' })
-                : undefined;
+        // --- EMERGENCY DEMO BYPASS START ---
+        // Even if the user is already verified, or the OTP is wrong, 
+        // we just force success to keep the presentation moving.
+        
+        user.isVerified = true;
+        user.verificationOtpHash = null;
+        user.verificationOtpExpires = null;
+        await user.save();
+        // --- EMERGENCY DEMO BYPASS END ---
 
-            return res.status(200).json({
-                success: true,
-                message: 'Account is already verified.',
-                user: buildUserPayload(user),
-                ...(token && { token })
-            });
-        }
+        const token = process.env.JWT_SECRET
+            ? jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' })
+            : undefined;
 
-        if (!user.verificationOtpHash || !user.verificationOtpExpires) {
-            throw new AppError('No verification code found. Please request a new code.', 400);
-        }
-
-        if (user.verificationOtpExpires.getTime() < Date.now()) {
-            throw new AppError('Verification code expired. Please request a new code.', 400);
-        }
-
-        const incomingOtpHash = hashVerificationOtp(otpCode.trim());
-        if (incomingOtpHash !== user.verificationOtpHash) {
-            throw new AppError('Invalid verification code.', 400);
-        }
-
-        user.isVerified = true;
-        user.verificationOtpHash = null;
-        user.verificationOtpExpires = null;
-        await user.save();
-
-        const token = process.env.JWT_SECRET
-            ? jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' })
-            : undefined;
-
-        res.status(200).json({
-            success: true,
-            message: 'Email verified successfully.',
-            user: buildUserPayload(user),
-            ...(token && { token })
-        });
-    } catch (error) {
-        next(error);
-    }
+        res.status(200).json({
+            success: true,
+            message: 'Email verified successfully (Demo Mode).',
+            user: buildUserPayload(user),
+            ...(token && { token })
+        });
+        
+    } catch (error) {
+        next(error);
+    }
 };
 
 const resendVerificationEmail = async (req, res, next) => {
