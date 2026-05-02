@@ -39,10 +39,23 @@ const verifyMailer = async (req, res, next) => {
 };
 
 const sendResetPasswordOtpEmail = async (user, otpCode) => {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
         from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
         to: user.email,
+        replyTo: process.env.EMAIL_USER,
+        envelope: {
+            from: process.env.EMAIL_USER,
+            to: user.email
+        },
         subject: 'Your EduSync Password Reset Code',
+        text: [
+            'EduSync Password Reset',
+            '',
+            `Your password reset code is: ${otpCode}`,
+            '',
+            'This code expires in 10 minutes.',
+            'If you did not request this, you can safely ignore this email.'
+        ].join('\n'),
         html: `
             <div style="font-family: Arial, sans-serif; background:#f7f7f7; padding:24px;">
                 <div style="max-width:560px; margin:0 auto; background:#ffffff; border:1px solid #ececec; border-radius:12px; overflow:hidden;">
@@ -61,6 +74,12 @@ const sendResetPasswordOtpEmail = async (user, otpCode) => {
                 </div>
             </div>
         `
+    });
+
+    console.log('Reset password email sent:', {
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected
     });
 };
 
