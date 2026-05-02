@@ -6,25 +6,30 @@ const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 // At the very top of authController.js
 const dns = require('dns');
+
+// FORCE Node.js to resolve names using IPv4 first
 if (dns.setDefaultResultOrder) {
     dns.setDefaultResultOrder('ipv4first');
 }
 
+// 1. Updated Transporter
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 587,         // Hardcoded to force 587
-    secure: false,     // Hardcoded to force false
+    port: 587,
+    secure: false, 
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
-    family: 4,         // This kills the ENETUNREACH IPv6 error
-    connectionTimeout: 30000, // 30 seconds
+    // 2. FORCE the socket to use IPv4
+    family: 4, 
+    connectionTimeout: 20000,
     tls: {
-        rejectUnauthorized: false
+        // 3. Strict TLS settings to prevent handshake hangs
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
     }
 });
-
 const VERIFICATION_OTP_EXPIRY_MS = 10 * 60 * 1000;
 
 const generateVerificationOtp = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
