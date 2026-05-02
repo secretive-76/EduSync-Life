@@ -17,9 +17,13 @@ const { notFound, errorHandler } = require('./middleware/errorHandler');
 const app = express();
 
 app.use(cors({
-    origin: 'https://edusync-frontend-rndc.onrender.com',
+    origin: [
+        "http://127.0.0.1:5500",           // For your local testing (the one in the screenshot)
+        "http://localhost:5500",           // Sometimes the browser uses localhost
+        "https://edusync-frontend-rndc.onrender.com" // Your live frontend
+    ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    methods: ["GET", "POST", "PUT", "DELETE"]
 }));
 app.use(express.json());
 
