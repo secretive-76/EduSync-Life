@@ -11,29 +11,22 @@ if (typeof dns.setDefaultResultOrder === 'function') {
 }
 
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: Number(process.env.EMAIL_PORT) || 465,
+    host: 'smtp.gmail.com',
+    port: 465,
     secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        // This is the most common reason for Render failures
+        family: 4,
         servername: 'smtp.gmail.com',
-        family: 4, 
         rejectUnauthorized: false
     },
-    // Adding extra time for the Render free tier's slow network
-    connectionTimeout: 30000, 
-    greetingTimeout: 30000,
-    socketTimeout: 30000
+    connectionTimeout: 60000,
+    greetingTimeout: 60000,
+    socketTimeout: 60000
 });
-
-// Verify SMTP transporter at startup to catch network/auth issues early
-//transporter.verify()
-   // .then(() => console.log('SMTP Server is ready'))
-    //.catch((err) => console.error('SMTP transporter verification failed:', err));
 
 // Controller: run verify on-demand (HTTP) for remote debugging
 const verifyMailer = async (req, res, next) => {
@@ -273,11 +266,8 @@ const forgotPassword = async (req, res, next) => {
 
         if (user) {
             const otpCode = generateVerificationOtp();
-            const resetPasswordOtpHash = hashVerificationOtp(otpCode);
-            const resetPasswordOtpExpires = new Date(Date.now() + VERIFICATION_OTP_EXPIRY_MS);
-
-            user.resetPasswordOtpHash = resetPasswordOtpHash;
-            user.resetPasswordOtpExpires = resetPasswordOtpExpires;
+            user.resetPasswordOtpHash = hashVerificationOtp(otpCode);
+            user.resetPasswordOtpExpires = new Date(Date.now() + VERIFICATION_OTP_EXPIRY_MS);
             await user.save();
 
             try {
