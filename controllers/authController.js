@@ -4,24 +4,25 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
+// At the very top of authController.js
 const dns = require('dns');
-
-if (typeof dns.setDefaultResultOrder === 'function') {
-    dns.setDefaultResultOrder('ipv4first');
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
 }
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Using the built-in service helper
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // Must be false for port 587
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false // This helps bypass some network security blocks
-  }
+    host: "smtp.gmail.com",
+    port: 587,         // Hardcoded to force 587
+    secure: false,     // Hardcoded to force false
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+    },
+    family: 4,         // This kills the ENETUNREACH IPv6 error
+    connectionTimeout: 30000, // 30 seconds
+    tls: {
+        rejectUnauthorized: false
+    }
 });
 
 const VERIFICATION_OTP_EXPIRY_MS = 10 * 60 * 1000;
