@@ -95,6 +95,7 @@ const updateTask = async (req, res, next) => {
     try {
         const userId = req.user;
         const { taskId } = req.params;
+        console.log('updateTask called', { userId, taskId, body: req.body });
         const { title, scheduledDate, dayOfWeek, time, reminder, alarmEnabled, isCompleted } = req.body;
 
         if (!taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
@@ -153,6 +154,7 @@ const updateTask = async (req, res, next) => {
         await task.save();
         res.status(200).json({ success: true, data: task });
     } catch (error) {
+        console.error('updateTask error:', error);
         next(error);
     }
 };
