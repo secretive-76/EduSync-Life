@@ -17,20 +17,10 @@ oAuth2Client.setCredentials({ refresh_token: process.env.REFRESH_TOKEN });
 const sendEmail = async (options) => {
   const accessToken = await oAuth2Client.getAccessToken();
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Use SSL
+  service: 'gmail',
   auth: {
-    type: 'OAuth2',
-    user: process.env.EMAIL_USER,
-    clientId: process.env.CLIENT_ID,
-    clientSecret: process.env.CLIENT_SECRET,
-    refreshToken: process.env.REFRESH_TOKEN,
-    accessToken: accessToken.token,
-  },
-  tls: {
-    // This forces the connection to use IPv4 and bypasses the network reachability error
-    family: 4 
+    user: 'nujhatrity34@gmail.com',
+    pass: 'YOUR_16_CHAR_APP_PASSWORD_HERE' // No spaces
   }
 });
   const mailOptions = {
