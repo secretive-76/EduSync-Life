@@ -20,6 +20,7 @@ const transporter = nodemailer.createTransport({
     },
     tls: {
         // This is the most common reason for Render failures
+        servername: 'smtp.gmail.com',
         family: 4, 
         rejectUnauthorized: false
     },
