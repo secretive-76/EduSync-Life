@@ -169,11 +169,22 @@ const signup = async (req, res, next) => {
             await user.save();
         }
 
-        try {
-            await sendVerificationOtpEmail(user, otpCode);
-        } catch (mailError) {
-            console.error('OTP email error:', mailError);
-        }
+        setImmediate(() => {
+            sendVerificationOtpEmail(user, otpCode).catch(async (mailError) => {
+                console.error('OTP email error:', mailError);
+                try {
+                    const latestUser = await User.findById(user._id);
+
+                    if (latestUser) {
+                        latestUser.verificationOtpHash = null;
+                        latestUser.verificationOtpExpires = null;
+                        await latestUser.save();
+                    }
+                } catch (cleanupError) {
+                    console.error('Verification email cleanup error:', cleanupError);
+                }
+            });
+        });
 
         res.status(existingUser ? 200 : 201).json({
             success: true,
