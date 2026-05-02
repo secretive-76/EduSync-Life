@@ -16,11 +16,10 @@ oAuth2Client.setCredentials({ refresh_token: process.env.REFRESH_TOKEN });
 
 const sendEmail = async (options) => {
   const accessToken = await oAuth2Client.getAccessToken();
-
- const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465, // Use 465 for SSL
-  secure: true, // Use true for port 465
+  port: 465,
+  secure: true, // Use SSL
   auth: {
     type: 'OAuth2',
     user: process.env.EMAIL_USER,
@@ -29,8 +28,11 @@ const sendEmail = async (options) => {
     refreshToken: process.env.REFRESH_TOKEN,
     accessToken: accessToken.token,
   },
+  tls: {
+    // This forces the connection to use IPv4 and bypasses the network reachability error
+    family: 4 
+  }
 });
-
   const mailOptions = {
     from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
     to: options.email,
