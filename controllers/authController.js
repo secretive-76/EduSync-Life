@@ -4,34 +4,41 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
-// At the very top of authController.js
-const dns = require('dns');
+const { google } = require('googleapis');
 
-// FORCE Node.js to resolve names using IPv4 first
-if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder('ipv4first');
-}
+// Setup OAuth2 Client
+const oAuth2Client = new google.auth.OAuth2(
+  process.env.CLIENT_ID,
+  process.env.CLIENT_SECRET,
+  "https://developers.google.com/oauthplayground"
+);
+oAuth2Client.setCredentials({ refresh_token: process.env.REFRESH_TOKEN });
 
-// 1. Updated Transporter
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false, // TLS
+const sendEmail = async (options) => {
+  const accessToken = await oAuth2Client.getAccessToken();
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+      type: 'OAuth2',
+      user: process.env.EMAIL_USER,
+      clientId: process.env.CLIENT_ID,
+      clientSecret: process.env.CLIENT_SECRET,
+      refreshToken: process.env.REFRESH_TOKEN,
+      accessToken: accessToken.token,
     },
-    family: 4, // Forces IPv4 to bypass the ENETUNREACH error
-    connectionTimeout: 45000, // 45 seconds to allow for cloud latency
-    greetingTimeout: 45000,
-    socketTimeout: 45000,
-    debug: true, // Enable this to see the exact SMTP conversation in logs
-    logger: true, // This will log the actual handshake steps
-    tls: {
-        rejectUnauthorized: false,
-        minVersion: "TLSv1.2"
-    }
-});
+  });
+
+  const mailOptions = {
+    from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
+    to: options.email,
+    subject: options.subject,
+    text: options.text,
+    html: options.html,
+  };
+
+  return await transporter.sendMail(mailOptions);
+};
 const VERIFICATION_OTP_EXPIRY_MS = 10 * 60 * 1000;
 
 const generateVerificationOtp = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
@@ -46,30 +53,12 @@ const buildUserPayload = (user) => ({
 });
 
 const sendVerificationOtpEmail = async (user, otpCode) => {
-    const info = await transporter.sendMail({
-        from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
-        to: user.email,
-        replyTo: process.env.EMAIL_USER,
-        // Using the envelope helps with SMTP routing on Render
-        envelope: {
-            from: process.env.EMAIL_USER,
-            to: user.email
-        },
-        subject: 'Your EduSync Verification Code',
-        // Plain text fallback improves spam scores
-        text: `Verify your EduSync account. Your 6-digit code is: ${otpCode}. It expires in 10 minutes.`,
-        html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-                <h2 style="color: #2563eb;">Verify your EduSync account</h2>
-                <p>Use this 6-digit code to activate your account. This email contains no verification link:</p>
-                <div style="text-align: center; margin: 28px 0;">
-                    <span style="display:inline-block; letter-spacing: 0.35em; font-size: 2rem; font-weight: 800; color: #111827; background: #f8fafc; padding: 16px 24px; border-radius: 12px; border: 1px solid #e2e8f0;">${otpCode}</span>
-                </div>
-                <p style="font-size: 0.875rem; color: #6b7280;">This code expires in 10 minutes.</p>
-                <p style="font-size: 0.875rem; color: #6b7280;">If you did not create this account, you can ignore this email.</p>
-            </div>
-        `
-    });
+    const info = await sendEmail({
+        email: user.email,
+        subject: 'Your EduSync Verification Code',
+        text: `Verify your EduSync account. Your 6-digit code is: ${otpCode}. It expires in 10 minutes.`,
+        html: `<!-- your html here -->`
+    });
 
     // Logging this helps you confirm Render successfully handed the mail to Gmail
     console.log('Verification email sent:', {
@@ -79,42 +68,12 @@ const sendVerificationOtpEmail = async (user, otpCode) => {
 };
 
 const sendResetPasswordOtpEmail = async (user, otpCode) => {
-    const info = await transporter.sendMail({
-        from: `"EduSync Support" <${process.env.EMAIL_USER}>`,
-        to: user.email,
-        replyTo: process.env.EMAIL_USER,
-        envelope: {
-            from: process.env.EMAIL_USER,
-            to: user.email
-        },
-        subject: 'Your EduSync Password Reset Code',
-        text: [
-            'EduSync Password Reset',
-            '',
-            `Your password reset code is: ${otpCode}`,
-            '',
-            'This code expires in 10 minutes.',
-            'If you did not request this, you can safely ignore this email.'
-        ].join('\n'),
-        html: `
-            <div style="font-family: Arial, sans-serif; background:#f7f7f7; padding:24px;">
-                <div style="max-width:560px; margin:0 auto; background:#ffffff; border:1px solid #ececec; border-radius:12px; overflow:hidden;">
-                    <div style="background:#800020; color:#ffffff; padding:18px 24px; font-size:20px; font-weight:700;">
-                        EduSync Password Reset
-                    </div>
-                    <div style="padding:24px; color:#1f2937; line-height:1.6;">
-                        <p style="margin:0 0 12px 0;">We received a request to reset your password.</p>
-                        <p style="margin:0 0 20px 0;">Enter this 6-digit code in the app to continue:</p>
-                        <div style="text-align:center; margin:20px 0 24px 0;">
-                            <span style="display:inline-block; min-width:220px; padding:14px 18px; border-radius:10px; background:#800020; color:#ffffff; font-size:36px; font-weight:800; letter-spacing:0.3em;">${otpCode}</span>
-                        </div>
-                        <p style="margin:0; color:#4b5563; font-size:14px;">This code expires in 10 minutes.</p>
-                        <p style="margin:10px 0 0 0; color:#6b7280; font-size:13px;">If you did not request this, you can safely ignore this email.</p>
-                    </div>
-                </div>
-            </div>
-        `
-    });
+    const info = await sendEmail({
+        email: user.email,
+        subject: 'Your EduSync Password Reset Code',
+        text: `Your password reset code is: ${otpCode}`,
+        html: `<!-- your html here -->`
+    });
 
     console.log('Reset password email sent:', {
         messageId: info.messageId,
@@ -164,23 +123,27 @@ const signup = async (req, res, next) => {
             await user.save();
         }
 
-        setImmediate(() => {
-            sendVerificationOtpEmail(user, otpCode).catch(async (mailError) => {
-                console.error('OTP email error:', mailError);
-                try {
-                    const latestUser = await User.findById(user._id);
-
-                    if (latestUser) {
-                        latestUser.verificationOtpHash = null;
-                        latestUser.verificationOtpExpires = null;
-                        await latestUser.save();
-                    }
-                } catch (cleanupError) {
-                    console.error('Verification email cleanup error:', cleanupError);
-                }
-            });
-        });
-
+// Inside forgotPassword
+// ... inside signup logic ...
+setImmediate(async () => {
+    try {
+        // Corrected to send the VERIFICATION email, not the reset one
+        await sendVerificationOtpEmail(user, otpCode);
+    } catch (mailError) {
+        console.error('OTP email error:', mailError);
+        try {
+            const latestUser = await User.findById(user._id);
+            if (latestUser) {
+                // Clear verification fields on failure
+                latestUser.verificationOtpHash = null;
+                latestUser.verificationOtpExpires = null;
+                await latestUser.save();
+            }
+        } catch (cleanupError) {
+            console.error('Verification email cleanup error:', cleanupError);
+        }
+    }
+});
         res.status(existingUser ? 200 : 201).json({
             success: true,
             message: 'Verification code sent to your email. Enter the OTP to activate your account.',
@@ -208,10 +171,7 @@ const login = async (req, res, next) => {
             throw new AppError('User not found', 404);
         }
 
-        const isBcryptHash = typeof user.password === 'string' && user.password.startsWith('$2');
-        const passwordMatches = isBcryptHash
-            ? await bcrypt.compare(password, user.password)
-            : user.password === password;
+        const passwordMatches = await bcrypt.compare(password, user.password);
 
         if (!passwordMatches) {
             throw new AppError('Wrong password', 400);
@@ -461,33 +421,16 @@ const verifyResetOtp = async (req, res, next) => {
 };
 
 
-
 // Controller: run verify on-demand (HTTP) for remote debugging
 const verifyMailer = async (req, res, next) => {
-    try {
-        await transporter.verify();
-        res.status(200).json({ success: true, message: 'SMTP connection successful' });
-    } catch (error) {
-        next(error);
-    }
+    try {
+        // Just call sendEmail with a test configuration to see if it throws an error
+        await oAuth2Client.getAccessToken(); 
+        res.status(200).json({ success: true, message: 'OAuth2 and Google API connection successful' });
+    } catch (error) {
+        next(error);
+    }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 module.exports = {
     signup,
