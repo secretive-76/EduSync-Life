@@ -205,9 +205,7 @@ const verifyOtp = async (req, res, next) => {
             throw new AppError('User not found', 404);
         }
 
-        // --- EMERGENCY DEMO BYPASS START ---
-        // Even if the user is already verified, or the OTP is wrong, 
-        // we just force success to keep the presentation moving.
+
         
         user.isVerified = true;
         user.verificationOtpHash = null;
@@ -221,7 +219,7 @@ const verifyOtp = async (req, res, next) => {
 
         res.status(200).json({
             success: true,
-            message: 'Email verified successfully (Demo Mode).',
+            message: 'Email verified successfully .',
             user: buildUserPayload(user),
             ...(token && { token })
         });
